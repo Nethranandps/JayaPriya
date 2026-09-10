@@ -37,9 +37,9 @@ export default function GrowthScene({ active, onSelect, capabilities }) {
   const { scrollYProgress } = useScroll({ target: scene, offset: ['start 90px', 'end end'] });
   const calendarProgress = useTransform(scrollYProgress, value => `${Math.min(100, Math.max(0, value * 100))}%`);
   const centerShift = reduced || compact ? 0 : stageShift;
-  const stageX = useTransform(scrollYProgress, [0, 0.14, 0.92, 1], [0, centerShift, centerShift, 0]);
-  const stageScale = useTransform(scrollYProgress, [0, 0.14, 0.92, 1], [1, reduced ? 1 : 1.32, reduced ? 1 : 1.32, 0.98]);
-  const stageRadius = useTransform(scrollYProgress, [0, 0.14, 0.92, 1], ['0px', '8px', '8px', '0px']);
+  const stageX = useTransform(scrollYProgress, [0, 0.14, 1], [0, centerShift, centerShift]);
+  const stageScale = useTransform(scrollYProgress, [0, 0.14, 0.92, 1], [1, reduced ? 1 : 1.32, reduced ? 1 : 1.32, reduced ? 1 : 1.2]);
+  const stageRadius = useTransform(scrollYProgress, [0, 0.14, 1], ['0px', '8px', '8px']);
   const objectY = useTransform(scrollYProgress, [0, 1], [0, reduced ? 0 : -18]);
   const objectRotateX = useTransform(scrollYProgress, [0, 1], [5, reduced ? 5 : 12]);
 

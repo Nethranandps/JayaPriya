@@ -5,6 +5,7 @@ import GrowthScene from './components/growth-scene';
 import DancingLetters from './components/ui/dancing-letters';
 import { TubesBackground } from './components/ui/neon-flow';
 import { MagneticCursor } from './components/ui/magnetic-cursor';
+import { FlipFluid } from './components/ui/flip-fluid';
 
 import { capabilities, projects, process, email } from './portfolio-data';
 import './App.css';
@@ -192,43 +193,64 @@ function ContactParticleCanvas() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    const host = canvas.parentElement;
     const ctx = canvas.getContext('2d');
+    const fit = (x, a, b, c, d) => c + (d - c) * Math.min(1, Math.max(0, (x - a) / (b - a)));
+
     let animationFrame = 0;
     let width = 0;
     let height = 0;
     let dpr = 1;
-    const pointer = { x: 0, y: 0, active: false, holding: false };
-    const particles = [];
+    let fluid = null;
+    let gravity = 0;
+    let emitSpeed = 0;
+    let visible = true;
+    let lastTime = 0;
+    let shapes = null;
+    let sizes = null;
+    let shapeSize = 12;
+    const emitter = { x: 0, y: 0 };
+    const pointer = { x: -1e4, y: -1e4, px: -1e4, py: -1e4, vx: 0, vy: 0, active: false, holding: false, touch: false };
+    const drained = [];
 
-    function resetParticles() {
-      particles.length = 0;
-      const count = Math.min(820, Math.max(560, Math.floor((width * height) / 1550)));
-      for (let index = 0; index < count; index += 1) {
-        const baseY = height * (0.48 + Math.random() * 0.52);
-        particles.push({
-          x: Math.random() * width,
-          y: baseY,
-          homeX: Math.random() * width,
-          homeY: baseY,
-          vx: (Math.random() - 0.5) * 0.35,
-          vy: (Math.random() - 0.5) * 0.35,
-          size: 2 + Math.random() * 3.8,
-          shape: index % 3,
-          drift: Math.random() * Math.PI * 2,
-          opacity: 0.55 + Math.random() * 0.38,
-        });
+    function setup() {
+      const cellsX = Math.ceil(fit(width, 320, 2560, 20, 80));
+      const spacing = width / cellsX;
+      const radius = Math.max(3.2, spacing * 0.2);
+      const looseness = 3.1;
+      const fillFraction = 0.4;
+      const count = Math.round(Math.min(3200, Math.max(320, (width * height * fillFraction) / (looseness * radius) ** 2)));
+      fluid = new FlipFluid(width, height, spacing, radius, count, looseness);
+      gravity = Math.ceil(fit(width, 320, 2560, 15, 3)) * (width / 2);
+      emitSpeed = gravity * 0.1;
+      shapeSize = radius * 2.5;
+      emitter.x = width / 2;
+      emitter.y = height * 0.5;
+      shapes = new Uint8Array(count);
+      sizes = new Float32Array(count);
+      for (let i = 0; i < count; i += 1) {
+        shapes[i] = Math.floor(Math.random() * 4);
+        sizes[i] = shapeSize * (0.75 + Math.random() * 0.45);
       }
+    }
+
+    function emitFrom(x, y) {
+      const jitter = width / 200;
+      const vy = (2 + Math.random() ** 2 * 3) * emitSpeed;
+      return fluid.emit(x + (Math.random() - 0.5) * jitter, y + (Math.random() - 0.5) * jitter, 0, vy);
     }
 
     function resize() {
       const rect = canvas.getBoundingClientRect();
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const nextDpr = Math.min(window.devicePixelRatio || 1, 2);
+      const widthChanged = Math.abs(rect.width - width) > 1;
+      dpr = nextDpr;
       width = rect.width;
       height = rect.height;
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      resetParticles();
+      if (widthChanged || !fluid) setup();
     }
 
     function updatePointer(event) {
@@ -236,99 +258,147 @@ function ContactParticleCanvas() {
       pointer.x = event.clientX - rect.left;
       pointer.y = event.clientY - rect.top;
       pointer.active = true;
+      pointer.touch = event.pointerType === 'touch';
     }
 
-    function drawParticle(particle) {
-      ctx.save();
-      ctx.translate(particle.x, particle.y);
-      ctx.rotate(particle.drift);
-      ctx.globalAlpha = particle.opacity;
+    function drawParticles() {
+      const pos = fluid.particlePos;
+      const angle = fluid.particleAngle;
+      ctx.globalAlpha = 0.96;
       ctx.fillStyle = '#fff';
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1.6;
-      if (particle.shape === 0) {
-        ctx.beginPath();
-        ctx.moveTo(-particle.size, 0);
-        ctx.lineTo(particle.size, 0);
-        ctx.moveTo(0, -particle.size);
-        ctx.lineTo(0, particle.size);
-        ctx.stroke();
-      } else if (particle.shape === 1) {
-        ctx.fillRect(-particle.size * 0.58, -particle.size * 0.58, particle.size * 1.16, particle.size * 1.16);
-      } else {
-        ctx.beginPath();
-        ctx.arc(0, 0, particle.size * 0.55, 0, Math.PI * 2);
-        ctx.fill();
+      ctx.beginPath();
+      for (let i = 0; i < fluid.numParticles; i += 1) {
+        if (!fluid.particleActive[i] || shapes[i] === 3) continue;
+        const x = pos[2 * i];
+        const y = pos[2 * i + 1];
+        const s = sizes[i];
+        const a = angle[i];
+        if (shapes[i] === 0) {
+          ctx.moveTo(x + s * 0.5, y);
+          ctx.arc(x, y, s * 0.5, 0, Math.PI * 2);
+        } else if (shapes[i] === 1) {
+          const h = s * 0.46;
+          const c = Math.cos(a);
+          const n = Math.sin(a);
+          ctx.moveTo(x + (-h * c + h * n), y + (-h * n - h * c));
+          ctx.lineTo(x + (h * c + h * n), y + (h * n - h * c));
+          ctx.lineTo(x + (h * c - h * n), y + (h * n + h * c));
+          ctx.lineTo(x + (-h * c - h * n), y + (-h * n + h * c));
+          ctx.closePath();
+        } else {
+          const r = s * 0.58;
+          for (let k = 0; k < 3; k += 1) {
+            const t = a + (k * Math.PI * 2) / 3;
+            const px = x + Math.cos(t) * r;
+            const py = y + Math.sin(t) * r;
+            if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+        }
       }
-      ctx.restore();
+      ctx.fill();
+
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(1.4, shapeSize * 0.2);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let i = 0; i < fluid.numParticles; i += 1) {
+        if (!fluid.particleActive[i] || shapes[i] !== 3) continue;
+        const x = pos[2 * i];
+        const y = pos[2 * i + 1];
+        const h = sizes[i] * 0.5;
+        const c = Math.cos(angle[i]) * h;
+        const n = Math.sin(angle[i]) * h;
+        ctx.moveTo(x - c, y - n);
+        ctx.lineTo(x + c, y + n);
+        ctx.moveTo(x + n, y - c);
+        ctx.lineTo(x - n, y + c);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
 
     function tick(time) {
+      animationFrame = requestAnimationFrame(tick);
+      if (!visible) { lastTime = time; return; }
+      const dt = Math.min(1 / 60, Math.max(1 / 120, (time - lastTime) / 1000 || 1 / 60));
+      lastTime = time;
+
+      // Pouring: on load the shapes pour in from the centre; while holding, they drain and pour from the cursor.
+      const pouring = pointer.holding && !pointer.touch && pointer.active;
+      const source = pouring ? pointer : emitter;
+      let budget = Math.ceil(2000 * dt);
+      while (budget > 0 && drained.length > 0) {
+        const id = drained.pop();
+        fluid.particlePos[2 * id] = source.x + (Math.random() - 0.5) * width / 200;
+        fluid.particlePos[2 * id + 1] = source.y;
+        fluid.particleVel[2 * id] = 0;
+        fluid.particleVel[2 * id + 1] = (2 + Math.random() ** 2 * 3) * emitSpeed;
+        fluid.particleActive[id] = 1;
+        budget -= 1;
+      }
+      while (budget > 0 && emitFrom(source.x, source.y)) budget -= 1;
+
+      // Cursor obstacle: grows with cursor speed, like the reference.
+      if (pointer.active) {
+        pointer.vx = (pointer.x - pointer.px) / dt;
+        pointer.vy = (pointer.y - pointer.py) / dt;
+      } else { pointer.vx = 0; pointer.vy = 0; }
+      const speed = Math.hypot(pointer.vx, pointer.vy);
+      let factor = pointer.touch ? (pointer.holding ? 0.35 : 0) : fit(speed / width, 0, 1, 0.2, 1);
+      if (pouring) factor = 0;
+      const obstacle = pointer.active && factor > 0
+        ? { x: pointer.x, y: pointer.y, radius: 90 * factor, vx: pointer.vx, vy: pointer.vy }
+        : { x: -1e4, y: -1e4, radius: 0, vx: 0, vy: 0 };
+      pointer.px = pointer.x;
+      pointer.py = pointer.y;
+
+      fluid.simulate(dt, gravity, 0, 60, 4, 1, obstacle, pouring, drained);
+
+      // Spin each shape a little with its motion.
+      const vel = fluid.particleVel;
+      const angle = fluid.particleAngle;
+      for (let i = 0; i < fluid.numParticles; i += 1) {
+        angle[i] += (vel[2 * i] - vel[2 * i + 1] * 0.5) * dt * 0.004;
+      }
+
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = '#1d37ff';
       ctx.fillRect(0, 0, width, height);
-
-      for (const particle of particles) {
-        const noiseX = Math.cos(time * 0.001 + particle.drift) * 0.018;
-        const noiseY = Math.sin(time * 0.0012 + particle.drift) * 0.018;
-        particle.vx += noiseX;
-        particle.vy += noiseY;
-
-        if (pointer.active) {
-          const dx = particle.x - pointer.x;
-          const dy = particle.y - pointer.y;
-          const distance = Math.hypot(dx, dy) || 1;
-          if (pointer.holding && distance < 310) {
-            const pull = (1 - distance / 310) * 1.65;
-            particle.vx += (-dx / distance) * pull;
-            particle.vy += (-dy / distance) * pull;
-          } else if (!pointer.holding && distance < 115) {
-            const push = (1 - distance / 115) * 0.72;
-            particle.vx += (dx / distance) * push;
-            particle.vy += (dy / distance) * push;
-          }
-        }
-
-        if (!pointer.holding) {
-          particle.vx += (particle.homeX - particle.x) * 0.0025;
-          particle.vy += (particle.homeY - particle.y) * 0.0032;
-        }
-
-        particle.vx *= pointer.holding ? 0.89 : 0.93;
-        particle.vy *= pointer.holding ? 0.89 : 0.93;
-        particle.x += particle.vx;
-        particle.y += particle.vy;
-        particle.drift += 0.008;
-
-        if (particle.x < -20) particle.x = width + 20;
-        if (particle.x > width + 20) particle.x = -20;
-        if (particle.y < -20) particle.y = height + 20;
-        if (particle.y > height + 20) particle.y = -20;
-
-        drawParticle(particle);
-      }
-
-      animationFrame = requestAnimationFrame(tick);
+      drawParticles();
     }
 
     resize();
+    lastTime = performance.now();
     animationFrame = requestAnimationFrame(tick);
-    const leave = () => { pointer.active = false; pointer.holding = false; };
-    const down = (event) => { updatePointer(event); pointer.holding = true; };
-    const up = () => { pointer.holding = false; };
 
-    canvas.addEventListener('pointermove', updatePointer);
-    canvas.addEventListener('pointerdown', down);
+    const leave = () => { pointer.active = false; pointer.holding = false; pointer.x = -1e4; pointer.y = -1e4; pointer.px = -1e4; pointer.py = -1e4; };
+    const down = (event) => {
+      if (event.target.closest('input, textarea, select, button, a')) return;
+      updatePointer(event);
+      pointer.px = pointer.x;
+      pointer.py = pointer.y;
+      pointer.holding = true;
+    };
+    const up = () => { pointer.holding = false; if (pointer.touch) leave(); };
+    const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }, { rootMargin: '80px' });
+    observer.observe(host);
+
+    host.addEventListener('pointermove', updatePointer);
+    host.addEventListener('pointerdown', down);
     window.addEventListener('pointerup', up);
-    canvas.addEventListener('pointerleave', leave);
+    window.addEventListener('pointercancel', up);
+    host.addEventListener('pointerleave', leave);
     window.addEventListener('resize', resize);
 
     return () => {
       cancelAnimationFrame(animationFrame);
-      canvas.removeEventListener('pointermove', updatePointer);
-      canvas.removeEventListener('pointerdown', down);
+      observer.disconnect();
+      host.removeEventListener('pointermove', updatePointer);
+      host.removeEventListener('pointerdown', down);
       window.removeEventListener('pointerup', up);
-      canvas.removeEventListener('pointerleave', leave);
+      window.removeEventListener('pointercancel', up);
+      host.removeEventListener('pointerleave', leave);
       window.removeEventListener('resize', resize);
     };
   }, []);
@@ -425,7 +495,7 @@ function Contact() {
               <textarea name="message" placeholder="Where are you now, and where do you want to go?" rows={3} maxLength={3000} required data-magnetic />
             </motion.label>
             <motion.div className="form-footer" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.45 }}>
-              <span>Click send when you are ready. Hold anywhere here to pull the particle field.</span>
+              <span>Click send when you are ready. Click and hold anywhere here to pour the particles from your cursor.</span>
               <button type="submit" className="button button-orange contact-submit" data-magnetic>Let's talk <ArrowUpRight size={19} /></button>
             </motion.div>
             <motion.p role="status" className="form-status" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>{status}</motion.p>
@@ -453,7 +523,6 @@ export default function App() {
   const { scrollYProgress } = useScroll();
   const progress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
   const reduced = useReducedMotion();
-  const selectedCapability = capabilities[active];
   const service = capabilities[expertiseActive];
   const ServiceIcon = icons[expertiseActive];
   const visibleProjects = projects.filter(project => filter === 'All work' || project.category === filter);
@@ -498,10 +567,6 @@ export default function App() {
           </motion.div>
           <div className="hero-interactive">
             <GrowthScene active={active} onSelect={setActive} capabilities={capabilities} />
-            <motion.div className="capability-result" aria-live="polite" key={active} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
-              <div><span className="meta">{selectedCapability.name}</span><strong>{selectedCapability.metric}</strong></div>
-              <p>{selectedCapability.result}<a href="#expertise" onClick={() => setExpertiseActive(active)} aria-label={`Learn about ${selectedCapability.name}`}><ArrowUpRight size={18} /></a></p>
-            </motion.div>
           </div>
         </div>
         <div className="capability-ribbon" aria-label="Growth disciplines">
