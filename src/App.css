@@ -4368,9 +4368,6 @@ dialog::backdrop {
     font-size: 10.5px
 }
 
-.results-section .path-result-card:hover {
-    transform: scale(1.28) translateY(-22px) !important
-}
 
 /* Proper left-origin wavy results marquee */
 .results-left-scene {
@@ -4460,4 +4457,333 @@ dialog::backdrop {
         top: 96px;
         gap: 42px
     }
+}
+
+/* Dark theme for everything between the hero and the contact section */
+.dark-zone {
+    --paper: #17181b;
+    --ink: #fcf9f1;
+    --line: #ffffff1f;
+    --muted: #a7a7a7;
+    position: relative;
+    isolation: isolate;
+    background: #0a0a0c;
+    color: #fcf9f1
+}
+
+/* One neon trail canvas, pinned to the viewport, shared by every dark section */
+.dark-zone-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none
+}
+
+.dark-zone-bg>div {
+    min-height: 0;
+    background: none
+}
+
+.dark-zone>.section,
+.dark-zone>.proof-strip,
+.dark-zone>.resume-section {
+    position: relative;
+    z-index: 1
+}
+
+.dark-zone .proof-strip,
+.dark-zone .expertise-section,
+.dark-zone .stack-section,
+.dark-zone .automation-section.dark-section {
+    background: #ffffff06
+}
+
+.dark-zone .about-section,
+.dark-zone .work-section,
+.dark-zone .experience-section,
+.dark-zone .resume-section {
+    background: transparent
+}
+
+.dark-zone .section-meta {
+    color: #999
+}
+
+.dark-zone .section-meta>span:first-child,
+.dark-zone .accent,
+.dark-zone .expertise-panel li svg,
+.dark-zone .stack-group>svg,
+.dark-zone .experience-row summary>.meta,
+.dark-zone .experience-result {
+    color: #ff916a
+}
+
+.dark-zone .heading-row>p,
+.dark-zone .process-description,
+.dark-zone .expertise-panel p,
+.dark-zone .project-info>.meta,
+.dark-zone .work-note,
+.dark-zone .experience-row summary p,
+.dark-zone .experience-detail,
+.dark-zone .resume-section p,
+.dark-zone .paper-columns span,
+.dark-zone .proof-strip div>span {
+    color: #a7a7a7
+}
+
+.dark-zone .heading-row h2 span {
+    color: #8cbfd8
+}
+
+.dark-zone .button-dark {
+    background: #fcf9f1;
+    color: #1c1c17
+}
+
+.dark-zone .proof-strip .container>div {
+    border-left-color: #ffffff1f
+}
+
+.dark-zone .process-step:hover {
+    background: #ffffff08
+}
+
+.dark-zone .process-step:hover,
+.dark-zone .stack-group:hover,
+.dark-zone .result-cell:hover {
+    box-shadow: 0 18px 55px #00000066
+}
+
+.dark-zone .expertise-tabs button:hover {
+    background: #1b1c1e;
+    border-color: #ff5a2c38
+}
+
+.dark-zone .expertise-panel {
+    background: #1b1c1e;
+    border-color: #ffffff14;
+    box-shadow: 0 28px 70px #00000055
+}
+
+.dark-zone .work-filters button.active {
+    background: #fcf9f1;
+    color: #1c1c17;
+    border-color: #fcf9f1
+}
+
+.dark-zone .project-open,
+.dark-zone .floating-project-card .project-open {
+    background: #1b1c1e;
+    border-color: #ffffff14;
+    box-shadow: 0 22px 70px #00000066
+}
+
+.dark-zone .floating-project-card .project-info {
+    background: #17181b
+}
+
+.dark-zone .project-visual {
+    background: #23252b;
+    color: #fcf9f1
+}
+
+.dark-zone .work-card-stage:before {
+    color: #ffffff08
+}
+
+.dark-zone .work-card-stage:after {
+    border-color: #ffffff14
+}
+
+.dark-zone .stack-group,
+.dark-zone .stack-group:nth-child(2),
+.dark-zone .stack-group:nth-child(3),
+.dark-zone .stack-group:nth-child(4) {
+    background: #1b1c1e;
+    border-color: #ffffff14;
+    box-shadow: 0 12px 36px #00000040
+}
+
+.dark-zone .stack-group>div>span {
+    background: #ffffff10;
+    border-color: #ffffff1a
+}
+
+.dark-zone .resume-paper {
+    background: #1b1c1e;
+    box-shadow: 14px 18px 0 #2a2b30, 0 20px 60px #00000066
+}
+
+.dark-zone .paper-columns i {
+    background: #3a3b40
+}
+
+/* Impact section on the dark theme: flat black stage, vivid cards, cream outlines */
+.dark-zone .results-section.dark-section {
+    background: #ffffff06;
+    color: #fcf9f1
+}
+
+.dark-zone .results-section .section-meta,
+.dark-zone .results-section .heading-row>p {
+    color: #a7a7a7
+}
+
+.dark-zone .results-section .section-meta>span:first-child,
+.dark-zone .results-section .accent {
+    color: #ff916a
+}
+
+.dark-zone .results-section .section-heading-title,
+.dark-zone .results-section .heading-row h2 {
+    color: #8cbfd8
+}
+
+.dark-zone .results-section .path-result-card.result-card-0 { --card-bg: #fff7df; --card-ink: #17120c }
+.dark-zone .results-section .path-result-card.result-card-1 { --card-bg: #8cbfd8; --card-ink: #0a0a0c }
+.dark-zone .results-section .path-result-card.result-card-2 { --card-bg: #1d37ff; --card-ink: #fff8ee }
+.dark-zone .results-section .path-result-card.result-card-3 { --card-bg: #ffe100; --card-ink: #17120c }
+.dark-zone .results-section .path-result-card.result-card-4 { --card-bg: #ff4f8b; --card-ink: #fff8ee }
+.dark-zone .results-section .path-result-card.result-card-5 { --card-bg: #00c875; --card-ink: #17120c }
+.dark-zone .results-section .path-result-card.result-card-6 { --card-bg: #7a3cff; --card-ink: #fff8ee }
+
+.dark-zone .results-section .path-result-card,
+.dark-zone .results-section .path-result-card:hover,
+.dark-zone .results-section .path-result-card:nth-child(2n):hover {
+    background: var(--card-bg);
+    color: var(--card-ink);
+    border: 2px solid #fcf9f1;
+    box-shadow: 8px 9px 0 #fcf9f1, 0 18px 40px #00000066;
+    overflow: visible;
+    transform-style: preserve-3d
+}
+
+.dark-zone .results-section .path-result-card:hover,
+.dark-zone .results-section .path-result-card.is-flipped {
+    box-shadow: 14px 16px 0 #fcf9f1, 0 34px 70px #00000080;
+    z-index: 50
+}
+
+.dark-zone .results-section .result-cta {
+    background: #fff7df;
+    color: #17120c;
+    border: 2px solid #fcf9f1;
+    box-shadow: 10px 12px 0 #8cbfd8
+}
+
+.dark-zone .results-section .result-cta:hover {
+    background: #8cbfd8;
+    color: #0a0a0c;
+    box-shadow: 14px 16px 0 #fff7df
+}
+
+.dark-zone .results-section .result-cta>span {
+    color: inherit;
+    opacity: .7
+}
+
+/* Flip cards: front in normal flow, back mirrored behind it */
+.path-result-card .card-face {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden
+}
+
+.path-result-card .card-front {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    transform: translateZ(1px)
+}
+
+.path-result-card .card-back {
+    position: absolute;
+    inset: 0;
+    padding: inherit;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 6px;
+    transform: rotateY(180deg) translateZ(1px)
+}
+
+.path-result-card .card-back>.meta {
+    font-size: 7px;
+    opacity: .7
+}
+
+.path-result-card .card-back p {
+    font-size: 9.5px;
+    line-height: 1.4;
+    max-width: none
+}
+
+.path-result-card .card-back a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    align-self: flex-start;
+    font: 500 8px 'JetBrains Mono', monospace;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    border-bottom: 1px solid currentColor;
+    padding-bottom: 2px
+}
+
+.path-result-card .card-burst {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    pointer-events: none;
+    z-index: 2
+}
+
+.path-result-card .card-burst i {
+    position: absolute;
+    display: block;
+    width: 9px;
+    height: 9px;
+    margin: -4px;
+    background: #fcf9f1;
+    border-radius: 2px
+}
+
+.path-result-card:focus-visible {
+    outline: 2px solid #8cbfd8;
+    outline-offset: 4px
+}
+
+/* Principle card hover on the dark theme: charcoal card with a warm edge */
+.dark-zone .thesis {
+    padding-inline: 22px;
+    margin-inline: -22px
+}
+
+.dark-zone .thesis:hover {
+    background: #1b1c1e;
+    color: #fcf9f1;
+    border-color: #ff916a80;
+    box-shadow: 0 18px 40px #00000066
+}
+
+.dark-zone .signature {
+    color: #ff916a
+}
+
+/* Project visual metric: solid strip so the number reads over any artwork on the dark theme */
+.dark-zone .visual-metric {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 14px 22px 18px;
+    background: #1b1c1e;
+    border-top: 1px solid #ffffff14;
+    z-index: 3;
+    color: #fcf9f1
+}
+
+.dark-zone .seo-visual,
+.dark-zone .paid-visual,
+.dark-zone .network-visual {
+    position: relative;
+    z-index: 1
 }

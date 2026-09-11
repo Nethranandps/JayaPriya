@@ -130,9 +130,11 @@ const MarqueeItem = ({
     return unsubscribe
   }, [itemOffset, currentOffsetDistance])
 
+  // The interpolation list is a static prop, so the hook count is stable across renders.
   const cssVariables = Object.fromEntries(
     (cssVariableInterpolation || []).map(({ property, from, to }) => [
       property,
+      // eslint-disable-next-line react-hooks/rules-of-hooks
       useTransform(currentOffsetDistance, [0, 100], [from, to]),
     ])
   )

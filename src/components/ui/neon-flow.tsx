@@ -35,7 +35,11 @@ export function TubesBackground({
         if (!mounted) return;
 
         const app = TubesCursor(canvasRef.current, {
+          bloom: { threshold: 0, strength: 1.1, radius: 0.5 },
           tubes: {
+            // Thinner tubes than the library default (0.005 – 0.05) so the trail reads as an accent.
+            minRadius: 0.003,
+            maxRadius: 0.024,
             colors: ["#f967fb", "#53bc28", "#6958d5"],
             lights: {
               intensity: 200,

@@ -1,0 +1,38 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Deploys the Vite build as a static site on Render's CDN.
+# Deploys are triggered by GitHub Actions (.github/workflows/ci.yml) only after
+# lint and build pass, so autoDeploy is off here.
+services:
+  - type: web
+    name: personal-portfolio
+    runtime: static
+    branch: main
+    autoDeploy: false
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0
+    routes:
+      # Health endpoint for UptimeRobot: returns {"status":"ok"} with a 200.
+      - type: rewrite
+        source: /healthz
+        destination: /health.json
+      # Single-page app fallback.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /health.json
+        name: Cache-Control
+        value: no-store
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin

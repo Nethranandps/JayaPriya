@@ -218,7 +218,7 @@ function ContactParticleCanvas() {
       const spacing = width / cellsX;
       const radius = Math.max(3.2, spacing * 0.2);
       const looseness = 3.1;
-      const fillFraction = 0.4;
+      const fillFraction = 0.25;
       const count = Math.round(Math.min(3200, Math.max(320, (width * height * fillFraction) / (looseness * radius) ** 2)));
       fluid = new FlipFluid(width, height, spacing, radius, count, looseness);
       gravity = Math.ceil(fit(width, 320, 2560, 15, 3)) * (width / 2);
@@ -526,7 +526,27 @@ export default function App() {
   const service = capabilities[expertiseActive];
   const ServiceIcon = icons[expertiseActive];
   const visibleProjects = projects.filter(project => filter === 'All work' || project.category === filter);
-  const resultItems = [['800', 'Qualified paid leads', 'Within a 60-day sprint', '+'], ['80', 'Organic B2B leads', 'Through LinkedIn outreach', '+'], ['2500', 'Products optimized', 'Copy, metadata & on-page SEO', '+'], ['10', 'Online sales growth', 'For FirstHub Ecom', '×'], ['19 → 96', 'Website health', 'A stronger technical foundation', ''], ['11 → 24', 'Domain authority', 'Building organic credibility', ''], ['35', 'Webinar sign-ups', 'In just 14 days', '+']];
+  const resultItems = [
+    ['800', 'Qualified paid leads', 'Within a 60-day sprint', '+', 'Paid search and social tuned every week around lead quality, not clicks.'],
+    ['80', 'Organic B2B leads', 'Through LinkedIn outreach', '+', 'Ideal customer research, LinkedIn content, and personalised email follow-ups.'],
+    ['2500', 'Products optimized', 'Copy, metadata & on-page SEO', '+', 'Copy, metadata, and on-page SEO rewritten across an entire catalogue.'],
+    ['10', 'Online sales growth', 'For FirstHub Ecom', '×', 'One connected funnel for FirstHub Ecom, from first search to checkout.'],
+    ['19 → 96', 'Website health', 'A stronger technical foundation', '', 'Technical SEO fixes that turned a red audit score green.'],
+    ['11 → 24', 'Domain authority', 'Building organic credibility', '', 'Steady link building and content that earned its citations.'],
+    ['35', 'Webinar sign-ups', 'In just 14 days', '+', 'A two-week outreach sprint with a single, clear ask.'],
+  ];
+  const [flippedCard, setFlippedCard] = useState(null);
+  const [burst, setBurst] = useState(null);
+  const burstTimer = useRef(null);
+  const burstId = useRef(0);
+  useEffect(() => () => clearTimeout(burstTimer.current), []);
+  function flipCard(index) {
+    setFlippedCard(current => (current === index ? null : index));
+    burstId.current += 1;
+    setBurst({ index, id: burstId.current });
+    clearTimeout(burstTimer.current);
+    burstTimer.current = setTimeout(() => setBurst(null), 800);
+  }
 
   useEffect(() => {
     const observer = new IntersectionObserver(entries => {
@@ -574,6 +594,10 @@ export default function App() {
         </div>
       </section>
 
+      <div className="dark-zone">
+        <div className="dark-zone-bg" aria-hidden="true">
+          <TubesBackground className="sticky top-0 h-screen w-full pointer-events-none" enableClickInteraction={false} />
+        </div>
       <ScrollReveal className="proof-strip" delay={0.2} stagger={0.1}>
         <div className="container">
           <span className="meta">Strategy.<br />With something to show.</span>
@@ -729,9 +753,6 @@ export default function App() {
       </ScrollReveal>
 
       <ScrollReveal className="section automation-section dark-section relative min-h-[600px]" id="automation" delay={0.1}>
-        <TubesBackground className="absolute inset-0 z-0 pointer-events-none" enableClickInteraction={true}>
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/40" />
-        </TubesBackground>
         <div className="container relative z-10">
           <SectionHeading label="04 / The connected engine" aside="Less repetition. More possibility." description="When tools work together, people can focus on the work that actually needs them.">
             SMARTER SYSTEMS.<br /><span>MORE HUMAN WORK.</span>
@@ -827,18 +848,45 @@ export default function App() {
           <ScrollReveal delay={0.15} className="results-path-scene results-left-scene">
             <div className="results-left-marquee" aria-label="Marketing impact metrics">
               <div className="results-left-track">
-                {[...resultItems, ...resultItems].map(([value, label, note, suffix], i) => (
+                {[...resultItems, ...resultItems].map(([value, label, note, suffix, story], i) => {
+                  const flipped = flippedCard === i;
+                  return (
                   <motion.div
                     key={`${label}-${i}`}
-                    className={`result-cell path-result-card result-card-${i % resultItems.length}`}
+                    className={`result-cell path-result-card result-card-${i % resultItems.length}${flipped ? ' is-flipped' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={flipped}
+                    aria-label={`${value}${suffix} ${label}. Click to read the story.`}
+                    onClick={() => flipCard(i)}
+                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); flipCard(i); } }}
+                    animate={{ rotateY: flipped ? 180 : 0 }}
+                    transition={{ type: 'spring', stiffness: 210, damping: 19 }}
                     whileHover={{ y: -34, rotate: i % 2 ? 5 : -5, scale: 1.28, zIndex: 50, transition: { type: 'spring', stiffness: 260, damping: 16 } }}
                     whileTap={{ scale: 0.97 }}
                   >
-                    {suffix ? <Counter value={value} suffix={suffix} duration={1.5} delay={(i % resultItems.length) * 160} /> : <strong>{value}</strong>}
-                    <h3>{label}</h3>
-                    <span>{note}</span>
+                    <div className="card-face card-front" aria-hidden={flipped}>
+                      {suffix ? <Counter value={value} suffix={suffix} duration={1.5} delay={(i % resultItems.length) * 160} /> : <strong>{value}</strong>}
+                      <h3>{label}</h3>
+                      <span>{note}</span>
+                    </div>
+                    <div className="card-face card-back" aria-hidden={!flipped}>
+                      <span className="meta">The story</span>
+                      <p>{story}</p>
+                      <a href="#work" onClick={event => event.stopPropagation()} tabIndex={flipped ? 0 : -1}>See the work <ArrowUpRight size={11} /></a>
+                    </div>
+                    {burst?.index === i && (
+                      <span className="card-burst" aria-hidden="true" key={burst.id}>
+                        {Array.from({ length: 12 }).map((_, k) => {
+                          const angle = (k / 12) * Math.PI * 2;
+                          const reach = 58 + (k % 3) * 20;
+                          return <motion.i key={k} initial={{ x: 0, y: 0, opacity: 1, scale: 1 }} animate={{ x: Math.cos(angle) * reach, y: Math.sin(angle) * reach, opacity: 0, scale: 0.15, rotate: 200 }} transition={{ duration: 0.75, ease: 'easeOut' }} />;
+                        })}
+                      </span>
+                    )}
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
             </div>
             <motion.a
@@ -935,6 +983,7 @@ export default function App() {
           </Tilt>
         </div>
       </ScrollReveal>
+      </div>
       <MagneticCursor
         magneticFactor={0.5}
         blendMode="exclusion"
