@@ -1730,7 +1730,11 @@
 }
 
 .email-link {
-    display: flex;
+    /* Hug the text: the magnetic cursor sizes its highlight to this box, and a full-width
+       flex link made the highlight span the whole card and pull from the card's centre. */
+    display: inline-flex;
+    width: fit-content;
+    max-width: 100%;
     align-items: center;
     gap: 18px;
     font-size: clamp(14px, 1.8vw, 24px);

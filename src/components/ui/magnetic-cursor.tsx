@@ -262,8 +262,12 @@ export const MagneticCursor: FC<MagneticCursorProps> = ({
           const { clientX, clientY } = event;
           const { height, width, left, top } = el.getBoundingClientRect();
           const { magneticFactor } = configRef.current;
-          xTo((clientX - (left + width / 2)) * magneticFactor);
-          yTo((clientY - (top + height / 2)) * magneticFactor);
+          // getBoundingClientRect includes the current magnetic offset; measure from the
+          // element's resting position so the pull doesn't compound on itself.
+          const offsetX = (gsap.getProperty(el, 'x') as number) || 0;
+          const offsetY = (gsap.getProperty(el, 'y') as number) || 0;
+          xTo((clientX - (left - offsetX + width / 2)) * magneticFactor);
+          yTo((clientY - (top - offsetY + height / 2)) * magneticFactor);
           rafId = null;
         });
       };

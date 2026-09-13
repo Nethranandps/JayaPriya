@@ -474,12 +474,12 @@ function Contact() {
         <div className="contact-grid">
           <motion.div className="contact-copy" initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }}>
             <p>Have a challenge, an ambitious target, or a good question? I'd love to hear it.</p>
-            <motion.a className="email-link" href={`mailto:${email}`} data-magnetic whileHover={{ x: 4 }} whileTap={{ scale: 0.98 }}>
+            <a className="email-link" href={`mailto:${email}`} data-magnetic>
               {email}<ArrowUpRight size={22} />
-            </motion.a>
-            <motion.button className="text-button" onClick={copyEmail} data-magnetic whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            </a>
+            <button type="button" className="text-button" onClick={copyEmail} data-magnetic>
               {copied ? <Check size={15} /> : <Copy size={15} />}{copied ? 'Email copied' : 'Copy email address'}
-            </motion.button>
+            </button>
             <span className="contact-location meta">India <span>UTC +05:30</span></span>
           </motion.div>
           <motion.form ref={formRef} className="contact-form" onSubmit={submit} initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }}>
@@ -516,9 +516,9 @@ function Contact() {
           </motion.form>
         </div>
         <motion.footer initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.5 }}>
-          <motion.a className="wordmark" href="#top" data-magnetic whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>JAYA PRIYA<span>.</span></motion.a>
+          <a className="wordmark" href="#top" data-magnetic>JAYA PRIYA<span>.</span></a>
           <span className="meta">© {new Date().getFullYear()} Jaya Priya</span>
-          <motion.a className="text-button" href="#top" data-magnetic whileHover={{ x: 4 }} whileTap={{ scale: 0.98 }}>Back to top <ArrowUpRight size={16} /></motion.a>
+          <a className="text-button" href="#top" data-magnetic>Back to top <ArrowUpRight size={16} /></a>
         </motion.footer>
       </div>
     </section>
