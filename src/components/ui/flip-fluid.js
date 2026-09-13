@@ -47,6 +47,8 @@ export class FlipFluid {
     this.particleRestDensity = (this.h / (looseness * particleRadius)) ** 2;
     // Drift compensation strength in velocity units (px/s per unit of over-density).
     this.driftStiffness = width / 4;
+    // How much of the cursor's velocity a particle picks up when the cursor hits it.
+    this.obstacleKick = 2;
 
     for (let i = 0; i < this.fNumX; i += 1) {
       for (let j = 0; j < this.fNumY; j += 1) {
@@ -171,8 +173,8 @@ export class FlipFluid {
         const f = (hit - d) / d;
         x += dx * f;
         y += dy * f;
-        vel[2 * i] = ovx * 2;
-        vel[2 * i + 1] = ovy * 2;
+        vel[2 * i] = ovx * this.obstacleKick;
+        vel[2 * i + 1] = ovy * this.obstacleKick;
       }
       if (x < minX) { x = minX; vel[2 * i] = 0; }
       if (x > maxX) { x = maxX; vel[2 * i] = 0; }

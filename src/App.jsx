@@ -208,6 +208,7 @@ function ContactParticleCanvas() {
     let lastTime = 0;
     let shapes = null;
     let sizes = null;
+    let prevPos = null;
     let shapeSize = 12;
     const emitter = { x: 0, y: 0 };
     const pointer = { x: -1e4, y: -1e4, px: -1e4, py: -1e4, vx: 0, vy: 0, active: false, holding: false, touch: false };
@@ -217,20 +218,26 @@ function ContactParticleCanvas() {
       const cellsX = Math.ceil(fit(width, 320, 2560, 20, 80));
       const spacing = width / cellsX;
       const radius = Math.max(3.2, spacing * 0.2);
-      const looseness = 3.1;
+      const looseness = 2.6;
       const fillFraction = 0.25;
       const count = Math.round(Math.min(3200, Math.max(320, (width * height * fillFraction) / (looseness * radius) ** 2)));
       fluid = new FlipFluid(width, height, spacing, radius, count, looseness);
+      // Gentler density correction keeps the surface level without pumping energy into the pile.
+      fluid.driftStiffness = width / 16;
+      // Particles the cursor hits pick up a bit more than cursor speed; 2x threw the whole pile to the ceiling.
+      fluid.obstacleKick = 1.2;
       gravity = Math.ceil(fit(width, 320, 2560, 15, 3)) * (width / 2);
       emitSpeed = gravity * 0.1;
-      shapeSize = radius * 2.5;
+      // Shapes never exceed the collision diameter, so they touch but no longer pass through each other.
+      shapeSize = radius * 2;
+      prevPos = new Float32Array(count * 2);
       emitter.x = width / 2;
       emitter.y = height * 0.5;
       shapes = new Uint8Array(count);
       sizes = new Float32Array(count);
       for (let i = 0; i < count; i += 1) {
         shapes[i] = Math.floor(Math.random() * 4);
-        sizes[i] = shapeSize * (0.75 + Math.random() * 0.45);
+        sizes[i] = shapeSize * (0.7 + Math.random() * 0.3);
       }
     }
 
@@ -348,18 +355,25 @@ function ContactParticleCanvas() {
       let factor = pointer.touch ? (pointer.holding ? 0.35 : 0) : fit(speed / width, 0, 1, 0.2, 1);
       if (pouring) factor = 0;
       const obstacle = pointer.active && factor > 0
-        ? { x: pointer.x, y: pointer.y, radius: 90 * factor, vx: pointer.vx, vy: pointer.vy }
+        ? { x: pointer.x, y: pointer.y, radius: 70 * factor, vx: pointer.vx, vy: pointer.vy }
         : { x: -1e4, y: -1e4, radius: 0, vx: 0, vy: 0 };
       pointer.px = pointer.x;
       pointer.py = pointer.y;
 
-      fluid.simulate(dt, gravity, 0, 60, 4, 1, obstacle, pouring, drained);
+      // Two sub-steps per frame: fast particles otherwise cross more than a grid cell per step,
+      // which shows up as a shimmering pile.
+      prevPos.set(fluid.particlePos);
+      fluid.simulate(dt * 0.5, gravity, 0, 60, 4, 1, obstacle, pouring, drained);
+      fluid.simulate(dt * 0.5, gravity, 0, 60, 4, 1, obstacle, pouring, drained);
 
-      // Spin each shape a little with its motion.
-      const vel = fluid.particleVel;
+      // Spin each shape with how far it actually moved. Using velocity here made every shape
+      // rotate slowly forever, because a resting particle still carries one frame of gravity.
+      const pos = fluid.particlePos;
       const angle = fluid.particleAngle;
       for (let i = 0; i < fluid.numParticles; i += 1) {
-        angle[i] += (vel[2 * i] - vel[2 * i + 1] * 0.5) * dt * 0.004;
+        const dx = pos[2 * i] - prevPos[2 * i];
+        const dy = pos[2 * i + 1] - prevPos[2 * i + 1];
+        angle[i] += Math.max(-0.3, Math.min(0.3, (dx - dy * 0.5) * 0.004));
       }
 
       ctx.clearRect(0, 0, width, height);
