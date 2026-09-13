@@ -88,7 +88,7 @@ export default function GrowthScene({ active, onSelect, capabilities }) {
 
   return <div className={`growth-scene calendar-scene calendar-scroll-scene ${reduced ? 'calendar-static' : ''}`} ref={scene}>
     <motion.div className="calendar-sticky" ref={sticky} style={{ x: stageX, scale: stageScale, borderRadius: stageRadius }}>
-      <div className="scene-top meta"><span><span className="status-dot" /> The growth architecture</span><span>Five disciplines</span></div>
+      <div className="scene-top meta"><span>The growth architecture</span><span>Five disciplines</span></div>
       <div className="calendar-stage">
         <motion.div className="calendar-object" style={{ y: objectY, rotateX: objectRotateX, rotateY: -7, rotateZ: -2 }}>
           <div className="calendar-stand" aria-hidden="true" />
