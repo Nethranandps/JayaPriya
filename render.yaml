@@ -4,7 +4,7 @@
 # lint and build pass, so autoDeploy is off here.
 services:
   - type: web
-    name: personal-portfolio
+    name: jayapriya
     runtime: static
     branch: main
     autoDeploy: false
