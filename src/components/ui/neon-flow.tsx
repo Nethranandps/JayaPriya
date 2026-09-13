@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { cn } from "@/lib/utils";
 
 const randomColors = (count: number) => {
@@ -22,19 +22,23 @@ export function TubesBackground({
   const tubesRef = useRef<any>(null);
 
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    // Users who asked for less motion get the plain dark background instead of a WebGL scene.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
     let mounted = true;
-    let cleanup: (() => void) | undefined;
 
     const initTubes = async () => {
-      if (!canvasRef.current) return;
-
       try {
-        const module = await import('https://cdn.jsdelivr.net/npm/threejs-components@0.0.19/build/cursors/tubes1.min.js');
+        // Bundled from node_modules so Vite splits it into its own lazily loaded chunk
+        // instead of fetching an 800 KB module from a CDN at runtime.
+        const module = await import('threejs-components/build/cursors/tubes1.min.js');
         const TubesCursor = module.default;
 
         if (!mounted) return;
 
-        const app = TubesCursor(canvasRef.current, {
+        const app = TubesCursor(canvas, {
           bloom: { threshold: 0, strength: 1.1, radius: 0.5 },
           tubes: {
             // Thinner tubes than the library default (0.005 – 0.05) so the trail reads as an accent.
@@ -48,17 +52,16 @@ export function TubesBackground({
           }
         });
 
+        // The library pins the renderer to a 2x pixel ratio, so a full-screen canvas with a
+        // bloom pass pushes four times the pixels it needs to. Bloom blurs the output anyway,
+        // so 1x is visually identical and far cheaper on integrated GPUs.
+        if (app?.three) {
+          app.three.minPixelRatio = 1;
+          app.three.maxPixelRatio = 1;
+          app.three.resize();
+        }
+
         tubesRef.current = app;
-
-        const handleResize = () => {
-        };
-
-        window.addEventListener('resize', handleResize);
-        
-        cleanup = () => {
-          window.removeEventListener('resize', handleResize);
-        };
-
       } catch (error) {
         console.error("Failed to load TubesCursor:", error);
       }
@@ -68,7 +71,8 @@ export function TubesBackground({
 
     return () => {
       mounted = false;
-      if (cleanup) cleanup();
+      tubesRef.current?.dispose?.();
+      tubesRef.current = null;
     };
   }, []);
 
