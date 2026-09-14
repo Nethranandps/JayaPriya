@@ -3831,3 +3831,11 @@ vivid cards {
         margin-bottom: min(0px, calc(250px - 50vh))
     }
 }
+
+/* Contact headline is drawn on the particle canvas (liquid refraction); the DOM copy stays for
+   layout and accessibility. Chrome paints text-shadow even for transparent text, so drop it. */
+.contact-section.has-canvas-text h2,
+.contact-section.has-canvas-text h2>span {
+    color: transparent;
+    text-shadow: none
+}

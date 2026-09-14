@@ -6,6 +6,7 @@ import DancingLetters from './components/ui/dancing-letters';
 import { TubesBackground } from './components/ui/neon-flow';
 import { MagneticCursor } from './components/ui/magnetic-cursor';
 import { FlipFluid } from './components/ui/flip-fluid';
+import { DisturbanceField, buildTileMask, measureGlyphs, renderTextTexture } from './components/ui/liquid-text';
 
 import { capabilities, projects, process, email } from './portfolio-data';
 import './App.css';
@@ -211,14 +212,41 @@ function ContactParticleCanvas() {
     const pointer = { x: -1e4, y: -1e4, px: -1e4, py: -1e4, vx: 0, vy: 0, active: false, holding: false, touch: false };
     const drained = [];
 
+    // Liquid: a cursor-driven disturbance field tints the blue and refracts the headline, which is
+    // drawn here (the DOM heading goes transparent) so the particles can pass in front of it.
+    const LIQUID = {
+      splatRadius: 1.8,   // × the cursor obstacle's max radius
+      injectA: 0.5,       // liquid poured in per frame while moving (× 0.05 at rest)
+      injectV: 0.35,      // momentum poured in per frame; a passing cursor leaves most of its speed
+      decayA: 0.94,       // per frame: the tint lingers about a second
+      decayV: 0.92,       // per frame: the refraction settles a little before the tint
+      blurMix: 0.3,       // per frame: blobs spread and flatten
+      maxOff: 0.25,       // largest cut, × font size
+      vRef: 0.4,          // liquid speed for a full cut, × the cursor speed cap
+      deadZone: 0.15,     // fraction of vRef below which a tile stays put
+      gradientGain: 0.6,  // lens-like term from the liquid's edges
+      fluidGain: 0.1,     // particle splashes under the text refract it too
+      tintAlpha: 0.28,    // peak darkness of the blob
+    };
+    const h2 = host.querySelector('h2');
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const coarse = window.matchMedia('(hover: none)').matches;
+    const liquidOn = !reduced && !coarse && Boolean(h2);
+    const offset = new Float32Array(2);
+    let field = null;
+    let tint = null;
+    let text = null;
+    let revealAt = 0;
+    let disposed = false;
+
     function setup() {
       const cellsX = Math.ceil(fit(width, 320, 2560, 20, 80));
       const spacing = width / cellsX;
       const radius = Math.max(3.2, spacing * 0.2);
       const looseness = 2.6;
-      // The settled pile stands roughly fillFraction of the section tall; 0.32 brings it up to the light band at the bottom.
-      const fillFraction = 0.32;
-      const count = Math.round(Math.min(3600, Math.max(320, (width * height * fillFraction) / (looseness * radius) ** 2)));
+      // The settled pile stands roughly fillFraction of the section tall; 0.46 fills the lower half like the reference.
+      const fillFraction = 0.46;
+      const count = Math.round(Math.min(5400, Math.max(320, (width * height * fillFraction) / (looseness * radius) ** 2)));
       fluid = new FlipFluid(width, height, spacing, radius, count, looseness);
       // Gentler density correction keeps the surface level without pumping energy into the pile.
       fluid.driftStiffness = width / 16;
@@ -238,6 +266,24 @@ function ContactParticleCanvas() {
         shapes[i] = Math.floor(Math.random() * 4);
         sizes[i] = shapeSize * (0.7 + Math.random() * 0.3);
       }
+      field = new DisturbanceField(fluid.fNumX, fluid.fNumY, fluid.h);
+      const tintCanvas = document.createElement('canvas');
+      tintCanvas.width = fluid.fNumX;
+      tintCanvas.height = fluid.fNumY;
+      const tintCtx = tintCanvas.getContext('2d');
+      const image = tintCtx.createImageData(fluid.fNumX, fluid.fNumY);
+      for (let i = 0; i < image.data.length; i += 4) { image.data[i] = 8; image.data[i + 1] = 22; image.data[i + 2] = 200; }
+      tint = { canvas: tintCanvas, ctx: tintCtx, image, canFilter: 'filter' in ctx };
+    }
+
+    // The headline, rasterised once from the DOM's own glyph positions and cut into grid tiles.
+    function buildText() {
+      if (disposed || !fluid || !h2) return;
+      const measure = measureGlyphs(h2, canvas.getBoundingClientRect(), ctx);
+      const texture = renderTextTexture(measure, dpr);
+      if (!texture) return;
+      text = { ...texture, ...buildTileMask(texture, fluid.h, dpr) };
+      host.classList.add('has-canvas-text');
     }
 
     function emitFrom(x, y) {
@@ -257,6 +303,7 @@ function ContactParticleCanvas() {
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       if (widthChanged || !fluid) setup();
+      buildText();
     }
 
     function updatePointer(event) {
@@ -324,6 +371,68 @@ function ContactParticleCanvas() {
       ctx.globalAlpha = 1;
     }
 
+    // The liquid itself: a faint darker blue wherever the field holds liquid, upscaled from the
+    // grid and softened so it reads as a blob rather than a mosaic.
+    function drawTint() {
+      if (!field || !tint || field.maxA < 0.004) return;
+      const { nx, ny, cell } = field;
+      const data = tint.image.data;
+      const scale = LIQUID.tintAlpha * 255;
+      for (let idx = 0; idx < nx * ny; idx += 1) data[idx * 4 + 3] = Math.min(255, field.a[idx] * scale) | 0;
+      tint.ctx.putImageData(tint.image, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      if (tint.canFilter) ctx.filter = `blur(${(cell * 0.45).toFixed(1)}px)`;
+      ctx.drawImage(tint.canvas, 0, 0, nx * cell, ny * cell);
+      if (tint.canFilter) ctx.filter = 'none';
+    }
+
+    // The headline: one draw while the liquid under it is still; otherwise each grid tile is copied
+    // 1:1 (device pixels) with its own offset, which gives the sliced, shifted letters.
+    function drawText(time) {
+      if (!text) return;
+      let alpha = 1;
+      let rise = 0;
+      if (!reduced) {
+        if (!revealAt) return;
+        const t = Math.min(1, Math.max(0, (time - revealAt - 100) / 450));
+        alpha = 1 - (1 - t) ** 3;
+        rise = 20 * (1 - alpha);
+      }
+      ctx.globalAlpha = alpha;
+      const cell = fluid.h;
+      const maxOff = LIQUID.maxOff * text.fontSize;
+      const vRef = LIQUID.vRef * width * 0.6;
+      const still = !liquidOn || field.maxSpeed / vRef <= LIQUID.deadZone;
+      let draws = 0;
+      if (still) {
+        ctx.drawImage(text.canvas, text.x, text.y + rise, text.w, text.h);
+        draws = 1;
+      } else {
+        const tx0 = Math.round(text.x * dpr);
+        const ty0 = Math.round(text.y * dpr);
+        const tx1 = tx0 + text.wDev;
+        const ty1 = ty0 + text.hDev;
+        for (let j = text.j0; j <= text.j1; j += 1) {
+          const sy0 = Math.max(Math.round(j * cell * dpr), ty0);
+          const sy1 = Math.min(Math.round((j + 1) * cell * dpr), ty1);
+          if (sy1 <= sy0) continue;
+          for (let i = text.i0; i <= text.i1; i += 1) {
+            if (!text.mask[(j - text.j0) * text.cols + (i - text.i0)]) continue;
+            const sx0 = Math.max(Math.round(i * cell * dpr), tx0);
+            const sx1 = Math.min(Math.round((i + 1) * cell * dpr), tx1);
+            if (sx1 <= sx0) continue;
+            field.offsetAt(i, j, maxOff, vRef, LIQUID.gradientGain, LIQUID.deadZone, offset);
+            const ox = Math.round(offset[0] * dpr) / dpr;
+            const oy = Math.round(offset[1] * dpr) / dpr;
+            ctx.drawImage(text.canvas, sx0 - tx0, sy0 - ty0, sx1 - sx0, sy1 - sy0, sx0 / dpr + ox, sy0 / dpr + oy + rise, (sx1 - sx0) / dpr, (sy1 - sy0) / dpr);
+            draws += 1;
+          }
+        }
+      }
+      ctx.globalAlpha = 1;
+      canvas._liquidDraws = draws;
+    }
+
     function tick(time) {
       animationFrame = requestAnimationFrame(tick);
       if (!visible) { lastTime = time; return; }
@@ -368,11 +477,26 @@ function ContactParticleCanvas() {
       pointer.px = pointer.x;
       pointer.py = pointer.y;
 
+      // The cursor pours liquid and momentum into the disturbance field. Unlike the particle
+      // obstacle this works in the air above the pile, which is where the headline sits.
+      const frames = dt * 60;
+      if (liquidOn && pointer.active && !pointer.touch) {
+        const amount = LIQUID.injectA * (0.05 + 0.95 * Math.min(1, speed / (0.5 * maxSpeed)));
+        field.splat(pointer.x, pointer.y, pointer.vx, pointer.vy, LIQUID.splatRadius * maxRadius, amount, LIQUID.injectV, frames);
+      }
+
       // Two sub-steps per frame: fast particles otherwise cross more than a grid cell per step,
       // which shows up as a shimmering pile.
       prevPos.set(fluid.particlePos);
       fluid.simulate(dt * 0.5, gravity, 0, 60, 4, 1, obstacle, pouring, drained);
       fluid.simulate(dt * 0.5, gravity, 0, 60, 4, 1, obstacle, pouring, drained);
+
+      if (liquidOn) {
+        const j0 = text ? text.j0 : 0;
+        const j1 = text ? text.j1 : field.ny - 1;
+        field.addFluid(fluid, j0, j1, LIQUID.fluidGain, frames);
+        field.step(LIQUID.decayA, LIQUID.decayV, LIQUID.blurMix, frames, j0, j1);
+      }
 
       // Spin each shape with how far it actually moved. Using velocity here made every shape
       // rotate slowly forever, because a resting particle still carries one frame of gravity.
@@ -384,9 +508,10 @@ function ContactParticleCanvas() {
         angle[i] += Math.max(-0.3, Math.min(0.3, (dx - dy * 0.5) * 0.004));
       }
 
-      ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = '#1d37ff';
       ctx.fillRect(0, 0, width, height);
+      drawTint();
+      drawText(time);
       drawParticles();
     }
 
@@ -403,8 +528,25 @@ function ContactParticleCanvas() {
       pointer.holding = true;
     };
     const up = () => { pointer.holding = false; if (pointer.touch) leave(); };
-    const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }, { rootMargin: '80px' });
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target === host) visible = entry.isIntersecting;
+        else if (entry.isIntersecting && !revealAt) revealAt = performance.now();
+      }
+    }, { rootMargin: '80px' });
     observer.observe(host);
+    if (h2) observer.observe(h2);
+    // The section grows (form status) and the heading reflows (font swap); both need a fresh
+    // canvas size and texture, which window resize alone never reports.
+    const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(() => resize()) : null;
+    if (resizeObserver) { resizeObserver.observe(host); if (h2) resizeObserver.observe(h2); }
+    const fonts = document.fonts;
+    const onFonts = () => buildText();
+    if (fonts) {
+      fonts.ready.then(onFonts);
+      fonts.load('600 100px Oswald').then(onFonts).catch(() => {});
+      fonts.addEventListener('loadingdone', onFonts);
+    }
 
     host.addEventListener('pointermove', updatePointer);
     host.addEventListener('pointerdown', down);
@@ -414,8 +556,12 @@ function ContactParticleCanvas() {
     window.addEventListener('resize', resize);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(animationFrame);
       observer.disconnect();
+      if (resizeObserver) resizeObserver.disconnect();
+      if (fonts) fonts.removeEventListener('loadingdone', onFonts);
+      host.classList.remove('has-canvas-text');
       host.removeEventListener('pointermove', updatePointer);
       host.removeEventListener('pointerdown', down);
       window.removeEventListener('pointerup', up);
@@ -476,7 +622,7 @@ function Contact() {
           <span>Start a conversation</span>
           <span>Hold your cursor to gather the particles.</span>
         </motion.div>
-        <motion.h2 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }}>
+        <motion.h2 initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.1 }}>
           LET'S BUILD<br />SOMETHING THAT<br /><span>ACTUALLY GROWS</span><ArrowUpRight aria-hidden="true" />
         </motion.h2>
         <div className="contact-grid">
